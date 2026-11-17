@@ -1,0 +1,90 @@
+inputs = [
+	"../../deps/RmlUi/Include/RmlUi/CApi/Types.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Log.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Interfaces.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Core.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Context.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Element.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/ElementDocument.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Elements.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Variant.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Event.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/DataModel.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Factory.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/StyleSheet.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Debugger.h",
+	"../../deps/RmlUi/Include/RmlUi/CApi/Render.h",
+]
+
+output_folder = "out"
+package_name = "rmlui"
+remove_function_prefix = "rml_"
+remove_type_prefix = "Rml"
+remove_macro_prefix = "RML_"
+force_ada_case_types = true
+imports_file = "imports.odin"
+clang_include_paths = [
+	"../../deps/RmlUi/Include",
+]
+
+remove = [
+	"rml_sv",
+	"RMLUI_CAPI_API",
+	"RMLUI_CAPI_HEADER_H",
+	"RMLUI_CAPI_TYPES_H",
+	"RMLUI_CAPI_CORE_H",
+	"RMLUI_CAPI_INTERFACES_H",
+	"RMLUI_CAPI_CONTEXT_H",
+	"RMLUI_CAPI_ELEMENT_H",
+	"RMLUI_CAPI_ELEMENT_DOCUMENT_H",
+	"RMLUI_CAPI_ELEMENTS_H",
+	"RMLUI_CAPI_VARIANT_H",
+	"RMLUI_CAPI_EVENT_H",
+	"RMLUI_CAPI_DATA_MODEL_H",
+	"RMLUI_CAPI_FACTORY_H",
+	"RMLUI_CAPI_STYLE_SHEET_H",
+	"RMLUI_CAPI_DEBUGGER_H",
+	"RMLUI_CAPI_LOG_H",
+	"RMLUI_CAPI_RENDER_H",
+	"RMLUI_CAPI_H",
+]
+
+bit_setify = {
+	"RmlKeyModifier" = "Key_Modifier_Flag",
+}
+
+// Windows x64 ABI test passed: Odin string matches {const char*, size_t} by value.
+type_overrides = {
+	"RmlStringView" = "string",
+}
+
+procedure_parameter_defaults = {
+	"rml_load_font_face.fallback" = "false",
+	"rml_load_font_face.weight" = ".AUTO",
+	"rml_load_font_face.face_index" = "0",
+	"rml_load_font_face_with_family.weight" = ".AUTO",
+	"rml_load_font_face_with_family.fallback" = "false",
+	"rml_load_font_face_with_family.face_index" = "0",
+	"rml_load_font_face_from_memory.weight" = ".AUTO",
+	"rml_load_font_face_from_memory.fallback" = "false",
+	"rml_load_font_face_from_memory.face_index" = "0",
+	"rml_create_context.render_interface" = "nil",
+	"rml_create_context.text_input_handler" = "nil",
+	"rml_register_event_type.default_action_phase" = ".NONE",
+	"rml_release_textures.render_interface" = "nil",
+	"rml_release_texture.render_interface" = "nil",
+	"rml_release_compiled_geometry.render_interface" = "nil",
+	"rml_context_create_document.instancer_name" = "\"body\"",
+	"rml_context_load_document_from_memory.source_url" = "\"[document from memory]\"",
+	"rml_context_get_element_at_point.ignore_element" = "nil",
+	"rml_context_add_event_listener.in_capture_phase" = "false",
+	"rml_context_remove_event_listener.in_capture_phase" = "false",
+	"rml_document_show.modal" = ".NONE",
+	"rml_document_show.focus" = ".AUTO",
+	"rml_document_show.scroll" = ".AUTO",
+	"rml_document_find_next_tab_element.wrap_around" = "true",
+	"rml_element_get_relative_offset.area" = ".CONTENT",
+	"rml_element_get_absolute_offset.area" = ".CONTENT",
+	"rml_element_add_event_listener.in_capture_phase" = "false",
+	"rml_element_remove_event_listener.in_capture_phase" = "false",
+}

@@ -1,0 +1,33 @@
+inputs = [
+	"../../deps/RmlUi/Include/RmlUi/CApi/Backend.h",
+]
+
+output_folder = "out"
+package_name = "rmlui_backend"
+remove_function_prefix = "rml_"
+remove_type_prefix = "Rml"
+remove_macro_prefix = "RML_"
+force_ada_case_types = true
+imports_file = "imports.odin"
+clang_include_paths = [
+	"../../deps/RmlUi/Include",
+]
+
+remove = [
+	"RMLUI_CAPI_BACKEND_API",
+	"RMLUI_CAPI_BACKEND_H",
+]
+
+type_overrides = {
+	"RmlContext" = "rmlui.Context",
+	"RmlSystemInterface" = "rmlui.System_Interface",
+	"RmlRenderInterface" = "rmlui.Render_Interface",
+	"RmlStringView" = "string",
+	"RmlKeyIdentifier" = "rmlui.Key_Identifier",
+}
+
+procedure_parameter_defaults = {
+	"rml_backend_process_events.key_down_callback" = "nil",
+	"rml_backend_process_events.user_data" = "nil",
+	"rml_backend_process_events.power_save" = "false",
+}
