@@ -69,8 +69,22 @@ find_libclang_dir() {
 		if [ -n "$major" ] && [ "$major" -lt "$min_llvm_major" ]; then
 			continue
 		fi
+		# On macOS, libclang looks for its builtin headers (stdbool.h, stddef.h) in clang/<major>/include
+		# next to the dylib. A copy without them fails on every #include of a builtin header.
+		if [ "$lib_name" = "libclang.dylib" ] && [ -z "$(resource_include_dir "$dir")" ]; then
+			continue
+		fi
 		printf '%s\n' "$dir"
 		return
+	done
+}
+
+resource_include_dir() {
+	for header in "$1"/clang/*/include/stdbool.h; do
+		if [ -e "$header" ]; then
+			dirname "$header"
+			return
+		fi
 	done
 }
 
@@ -106,10 +120,26 @@ if ! (cd "$bindgen_src" && odin build src -out:bindgen.bin ${link_flags:+"$link_
 	exit 1
 fi
 
-# Without a sysroot, libclang on macOS cannot find the SDK's C headers.
-if [ "$(uname -s)" = "Darwin" ] && [ -z "${SDKROOT:-}" ] && command -v xcrun >/dev/null 2>&1; then
-	SDKROOT=$(xcrun --show-sdk-path)
-	export SDKROOT
+runtime_libclang_dir=""
+if [ "$(uname -s)" = "Darwin" ]; then
+	# Without a sysroot, libclang on macOS cannot find the SDK's C headers.
+	if [ -z "${SDKROOT:-}" ] && command -v xcrun >/dev/null 2>&1; then
+		SDKROOT=$(xcrun --show-sdk-path)
+		export SDKROOT
+	fi
+	# Odin puts -L/opt/homebrew/lib and -L/usr/local/lib ahead of -extra-linker-flags, so -lclang can
+	# bind to a different libclang than the one selected above. DYLD_LIBRARY_PATH loads the selected one.
+	if [ -n "$libclang_dir" ]; then
+		runtime_libclang_dir="$libclang_dir"
+		echo "Using clang builtin headers from $(resource_include_dir "$libclang_dir")"
+		if command -v otool >/dev/null 2>&1; then
+			linked=$(otool -L "$bindgen_src/bindgen.bin" | awk '/libclang/ { print $1 }')
+			case "$linked" in
+				"@rpath/libclang.dylib" | "$libclang_dir/libclang.dylib") ;;
+				*) echo "bindgen.bin links ${linked:-no libclang}; loading $libclang_dir/libclang.dylib instead." ;;
+			esac
+		fi
+	fi
 fi
 
 # odin-c-bindgen exits 0 even when clang fails to parse a header, so its log is checked for errors.
@@ -118,7 +148,7 @@ run_bindgen() {
 	package="$2"
 	log="$tools/$(basename "$package")-bindgen.log"
 	rm -rf "$config/out"
-	if ! (cd "$bindgen_src" && ./bindgen.bin "$config") >"$log" 2>&1; then
+	if ! (cd "$bindgen_src" && DYLD_LIBRARY_PATH="$runtime_libclang_dir" ./bindgen.bin "$config") >"$log" 2>&1; then
 		cat "$log" >&2
 		echo "odin-c-bindgen failed for $config." >&2
 		exit 1
