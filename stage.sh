@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-root=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+root=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 if [ "$#" -lt 1 ] || [ -z "$1" ]; then
 	echo "Usage: stage.sh <directory>" >&2
 	exit 1

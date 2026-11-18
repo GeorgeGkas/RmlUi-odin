@@ -3,7 +3,13 @@ package abi_test
 import "core:fmt"
 import "core:os"
 
-foreign import abi "abi.lib"
+when ODIN_OS == .Windows {
+	foreign import abi "abi.lib"
+} else when ODIN_OS == .Darwin {
+	foreign import abi "libabi.dylib"
+} else {
+	foreign import abi "libabi.so"
+}
 
 Callback :: proc "c" (value: string, user_data: rawptr)
 

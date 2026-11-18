@@ -1,0 +1,202 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ODIN_RELEASE: dev-2026-11a
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64 (VS 2026)
+            runner: windows-2025
+            bin: windows
+          - name: Windows x64 (VS 2022)
+            runner: windows-2022
+            bin: windows
+          - name: Linux x64
+            runner: ubuntu-24.04
+            bin: linux
+          - name: Linux arm64
+            runner: ubuntu-24.04-arm
+            bin: linux
+          - name: macOS arm64
+            runner: macos-15
+            bin: darwin
+          - name: macOS x64
+            runner: macos-15-intel
+            bin: darwin
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: ${{ env.ODIN_RELEASE }}
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build build-essential pkg-config curl zip unzip tar clang libclang-dev \
+            libx11-dev libxft-dev libxext-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev \
+            xvfb xauth libgl1 libglx-mesa0 libgl1-mesa-dri
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          for tool in cmake ninja pkg-config; do
+            command -v "$tool" >/dev/null 2>&1 || brew install "$tool"
+          done
+          brew install llvm
+
+      - name: Create vcpkg binary cache directory
+        shell: bash
+        run: mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ matrix.runner }}-${{ hashFiles('vcpkg.json', 'triplets/**', 'bootstrap.sh', 'bootstrap.ps1') }}
+          restore-keys: vcpkg-${{ matrix.runner }}-
+
+      - name: Restore libclang (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v6
+        with:
+          path: |
+            .tools/libclang.dll
+            .tools/libclang.lib
+          key: libclang-20.1.8-x86_64-pc-windows-msvc
+
+      - name: Bootstrap (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File bootstrap.ps1
+
+      - name: Bootstrap (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: sh bootstrap.sh
+
+      - name: ABI test (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File abi_test/run.ps1
+
+      - name: ABI test (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: sh abi_test/run.sh
+
+      # Linking and running must not depend on the CMake build tree.
+      - name: Move the build tree away
+        shell: bash
+        run: mv build build.moved
+
+      - name: Build sample (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File samples/basic/build.ps1
+
+      - name: Build sample (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: sh samples/basic/build.sh
+
+      - name: Check staged runtime dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ldd samples/basic/basic
+          if ldd samples/basic/basic | grep -q 'not found'; then
+            echo "::error::The staged sample has unresolved shared libraries."
+            exit 1
+          fi
+          if readelf -d bin/linux/*.so* | grep -E 'R(UN)?PATH' | grep -F "$GITHUB_WORKSPACE"; then
+            echo "::error::A runtime library has an rpath into the workspace."
+            exit 1
+          fi
+
+      - name: Check staged runtime dependencies (macOS)
+        if: runner.os == 'macOS'
+        working-directory: samples/basic
+        run: |
+          status=0
+          for file in basic *.dylib; do
+            [ -L "$file" ] && continue
+            for dep in $(otool -L "$file" | tail -n +2 | awk '{print $1}'); do
+              case "$dep" in
+                /usr/lib/*|/System/*) ;;
+                @rpath/*)
+                  if [ ! -e "${dep#@rpath/}" ]; then
+                    echo "::error::$file needs $dep, which is not staged."
+                    status=1
+                  fi
+                  ;;
+                *)
+                  echo "::error::$file depends on $dep by absolute path."
+                  status=1
+                  ;;
+              esac
+            done
+            if otool -l "$file" | grep -A2 LC_RPATH | grep -qF "$GITHUB_WORKSPACE"; then
+              echo "::error::$file has an rpath into the workspace."
+              status=1
+            fi
+          done
+          exit $status
+
+      # Mesa's llvmpipe provides OpenGL 3.3 under Xvfb. The sample runs until its window closes,
+      # so surviving until the timeout means it initialised and is rendering frames.
+      - name: Run sample under Xvfb (Linux)
+        if: runner.os == 'Linux'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set +e
+          xvfb-run -a -s "-screen 0 1280x1024x24" timeout 15 samples/basic/basic
+          status=$?
+          set -e
+          if [ "$status" -ne 124 ]; then
+            echo "::error::The sample exited with status $status before the timeout."
+            exit 1
+          fi
+
+      - name: Upload runtime binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: rmlui-${{ matrix.runner }}
+          path: bin/${{ matrix.bin }}
+          if-no-files-found: error
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ matrix.runner }}
+          path: |
+            build/configure.log
+            build/vcpkg-manifest-install.log
+            build.moved/configure.log
+            build.moved/vcpkg-manifest-install.log
+            .tools/*-bindgen.log
+            .tools/vcpkg/buildtrees/*/*.log
+          if-no-files-found: ignore

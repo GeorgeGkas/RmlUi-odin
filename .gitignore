@@ -23,3 +23,7 @@ abi_test/abi.lib
 abi_test/abi.exp
 abi_test/abi.obj
 abi_test/abi.bin
+abi_test/abi.exe
+abi_test/abi.pdb
+abi_test/libabi.so
+abi_test/libabi.dylib

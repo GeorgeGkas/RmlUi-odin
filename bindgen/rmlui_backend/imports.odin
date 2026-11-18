@@ -6,10 +6,10 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	foreign import lib {
-		"lib/linux/librmlui_capi_backend.so",
+		"../bin/linux/librmlui_capi_backend.so",
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"lib/darwin/librmlui_capi_backend.dylib",
+		"../bin/darwin/librmlui_capi_backend.dylib",
 	}
 }

@@ -146,12 +146,15 @@ main :: proc() {
 	callback_context.ctx = context
 	listener_instancer := rmlui.event_listener_instancer_create(instance_onclick, &callback_context)
 	rmlui.register_event_listener_instancer(listener_instancer)
+	defer {
+		rmlui.register_event_listener_instancer(nil)
+		rmlui.event_listener_instancer_destroy(listener_instancer)
+	}
 
 	model := rmlui.context_create_data_model(ctx, "game", false)
 	model_handle = rmlui.data_model_get_handle(model)
 	if !rmlui.data_model_constructor_is_valid(model) || !rmlui.data_model_bind_int(model, "counter", &app.counter) {
 		fmt.eprintln("Failed to bind the counter.")
-		rmlui.event_listener_instancer_destroy(listener_instancer)
 		rmlui.remove_context("main")
 		return
 	}
@@ -169,7 +172,6 @@ main :: proc() {
 	}
 	array_definition := rmlui.data_type_definition_create(.ARRAY, &array_callbacks, nil)
 	defer rmlui.data_type_definition_destroy(array_definition)
-	defer rmlui.event_listener_instancer_destroy(listener_instancer)
 	defer rmlui.remove_context("main")
 	if !rmlui.data_model_bind_custom(model, "items", array_definition, &app.items) {
 		fmt.eprintln("Failed to bind the item list.")

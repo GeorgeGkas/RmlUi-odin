@@ -53,7 +53,7 @@ bit_setify = {
 	"RmlKeyModifier" = "Key_Modifier_Flag",
 }
 
-// Windows x64 ABI test passed: Odin string matches {const char*, size_t} by value.
+// abi_test checks that Odin string matches {const char*, size_t} by value on each platform.
 type_overrides = {
 	"RmlStringView" = "string",
 }
