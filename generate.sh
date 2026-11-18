@@ -69,8 +69,8 @@ find_libclang_dir() {
 		if [ -n "$major" ] && [ "$major" -lt "$min_llvm_major" ]; then
 			continue
 		fi
-		# On macOS, libclang looks for its builtin headers (stdbool.h, stddef.h) in clang/<major>/include
-		# next to the dylib. A copy without them fails on every #include of a builtin header.
+		# On macOS, the builtin headers in clang/<major>/include next to the dylib are passed to
+		# libclang explicitly below. A copy without them fails on every #include of a builtin header.
 		if [ "$lib_name" = "libclang.dylib" ] && [ -z "$(resource_include_dir "$dir")" ]; then
 			continue
 		fi
@@ -131,14 +131,12 @@ if [ "$(uname -s)" = "Darwin" ]; then
 	# bind to a different libclang than the one selected above. DYLD_LIBRARY_PATH loads the selected one.
 	if [ -n "$libclang_dir" ]; then
 		runtime_libclang_dir="$libclang_dir"
-		echo "Using clang builtin headers from $(resource_include_dir "$libclang_dir")"
-		if command -v otool >/dev/null 2>&1; then
-			linked=$(otool -L "$bindgen_src/bindgen.bin" | awk '/libclang/ { print $1 }')
-			case "$linked" in
-				"@rpath/libclang.dylib" | "$libclang_dir/libclang.dylib") ;;
-				*) echo "bindgen.bin links ${linked:-no libclang}; loading $libclang_dir/libclang.dylib instead." ;;
-			esac
-		fi
+		# Upstream libclang runs its driver as a bare "clang", so on Darwin the builtin include path
+		# (stdbool.h, stddef.h) resolves relative to the working directory and is never found.
+		builtin_include_dir=$(resource_include_dir "$libclang_dir")
+		echo "Using clang builtin headers from $builtin_include_dir"
+		C_INCLUDE_PATH="$builtin_include_dir${C_INCLUDE_PATH:+:$C_INCLUDE_PATH}"
+		export C_INCLUDE_PATH
 	fi
 fi
 
